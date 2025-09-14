@@ -28,4 +28,8 @@ class TaskViewModel(private val repository: TaskRepository): ViewModel() {
             repository.deleteTask(task)
         }
     }
+
+    fun getTaskById(id: Int): Flow<Task?>{
+        return repository.getTaskById(id)
+    }
 }

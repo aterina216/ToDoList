@@ -28,7 +28,13 @@ class MainActivity : AppCompatActivity() {
         val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter = TaskAdapter()
+        adapter = TaskAdapter {
+            task -> val fragment = NoteDetailFragment.newInstance(task.id)
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit()
+        }
 
         binding.recyclerView.adapter = adapter
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
@@ -51,6 +57,14 @@ class MainActivity : AppCompatActivity() {
                     adapter.updateTasks(tasks)
                 }
             }
+        }
+
+        binding.addButton.setOnClickListener {
+            val fragment = NoteDetailFragment.newInstance()
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit()
         }
     }
 }

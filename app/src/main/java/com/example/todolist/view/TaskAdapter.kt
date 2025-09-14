@@ -7,7 +7,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.todolist.databinding.ItemTaskBinding
 import com.example.todolist.domain.Task
 
-class TaskAdapter() : RecyclerView.Adapter<TaskViewHolder>() {
+class TaskAdapter(
+    private val onItemClick: (Task) -> Unit
+) : RecyclerView.Adapter<TaskViewHolder>() {
 
     val taskList = mutableListOf<Task>()
 
@@ -16,7 +18,7 @@ class TaskAdapter() : RecyclerView.Adapter<TaskViewHolder>() {
         viewType: Int
     ): TaskViewHolder {
         val binding = ItemTaskBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return TaskViewHolder(binding)
+        return TaskViewHolder(binding, onItemClick)
     }
 
     override fun onBindViewHolder(
@@ -38,9 +40,13 @@ class TaskAdapter() : RecyclerView.Adapter<TaskViewHolder>() {
 
 }
 
-class TaskViewHolder(val binding: ItemTaskBinding) : RecyclerView.ViewHolder(binding.root) {
+class TaskViewHolder(val binding: ItemTaskBinding, private val onItemClick: (Task) -> Unit) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(task: Task){
         binding.taskTitleTextview.text = task.name
+
+        binding.root.setOnClickListener {
+            onItemClick(task)
+        }
     }
 }
