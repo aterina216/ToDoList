@@ -7,9 +7,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.todolist.databinding.ItemTaskBinding
 import com.example.todolist.domain.Task
 
-class TaskAdapter : RecyclerView.Adapter<TaskViewHolder>() {
+class TaskAdapter() : RecyclerView.Adapter<TaskViewHolder>() {
 
-    val taskList = mutableListOf<Task>(Task(1, "la", "la"))
+    val taskList = mutableListOf<Task>()
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -28,6 +28,12 @@ class TaskAdapter : RecyclerView.Adapter<TaskViewHolder>() {
 
     override fun getItemCount(): Int {
         return taskList.size
+    }
+
+    fun updateTasks(newTasks: List<Task>){
+        taskList.clear()
+        taskList.addAll(newTasks)
+        notifyDataSetChanged()
     }
 
 }
