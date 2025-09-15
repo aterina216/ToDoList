@@ -1,21 +1,39 @@
 package com.example.todolist.view
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.AlarmManager
+import android.app.AlarmManager.RTC_WAKEUP
+import android.app.DatePickerDialog
+import android.app.PendingIntent
+import android.app.TimePickerDialog
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.todolist.R
+import com.example.todolist.data.AppDataBase
+import com.example.todolist.data.TaskRepository
 import com.example.todolist.databinding.FragmentNoteDetailBinding
 import com.example.todolist.domain.Task
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.launch
 import java.util.Calendar
+
 
 // TODO: Rename parameter arguments, choose names that match
 // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -27,17 +45,28 @@ private const val ARG_PARAM2 = "param2"
  * Use the [NoteDetailFragment.newInstance] factory method to
  * create an instance of this fragment.
  */
+
+
+
+
+
+
 class NoteDetailFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-
-
     private lateinit var binding: FragmentNoteDetailBinding
     private lateinit var viewModel: TaskViewModel
+    private var taskId = -1
+    private lateinit var alarmManager: AlarmManager
+    private var selectedDate: Long = 0
 
-    var taskId = -1
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    // Регистрация для запроса разрешений
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Toast.makeText(requireContext(), "Разрешение предоставлено", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(requireContext(), "Разрешение необходимо для уведомлений", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreateView(
@@ -50,10 +79,23 @@ class NoteDetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        alarmManager = requireContext().getSystemService(Context.ALARM_SERVICE) as AlarmManager
         viewModel = ViewModelProvider(requireActivity())[TaskViewModel::class.java]
 
         arguments?.let {
             taskId = it.getInt("taskId", -1)
+        }
+
+        // Запрос разрешений при создании фрагмента
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
 
         setupToolBar()
@@ -61,55 +103,115 @@ class NoteDetailFragment : Fragment() {
         loadTaskIfExists()
     }
 
-    private fun setupToolBar(){
+    private fun setupToolBar() {
         binding.toolbar.setNavigationOnClickListener {
             parentFragmentManager.popBackStack()
         }
     }
 
-    private fun setupButtons(){
+    private fun setupButtons() {
         binding.saveButton.setOnClickListener {
             saveTask()
         }
 
         binding.setAlarmButton.setOnClickListener {
-            showAlarmDialog()
+            showDatePicker()
         }
     }
 
-    private fun showAlarmDialog(){
+    private fun showDatePicker() {
+        val datePicker = MaterialDatePicker.Builder.datePicker()
+            .setTitleText("Выберите дату")
+            .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
+            .build()
+
+        datePicker.addOnPositiveButtonClickListener { selection ->
+            selectedDate = selection
+            showTimePicker()
+        }
+
+        datePicker.show(parentFragmentManager, "DATE_PICKER")
+    }
+
+    private fun showTimePicker() {
         val timePicker = MaterialTimePicker.Builder()
             .setTimeFormat(TimeFormat.CLOCK_24H)
             .setHour(12)
             .setMinute(0)
-            .setTitleText("Выберите время напоминания")
+            .setTitleText("Выберите время")
             .build()
 
         timePicker.addOnPositiveButtonClickListener {
             val calendar = Calendar.getInstance().apply {
+                timeInMillis = selectedDate
                 set(Calendar.HOUR_OF_DAY, timePicker.hour)
                 set(Calendar.MINUTE, timePicker.minute)
                 set(Calendar.SECOND, 0)
+
+                // Если выбранное время уже прошло, устанавливаем на следующий день
+                if (timeInMillis <= System.currentTimeMillis()) {
+                    add(Calendar.DAY_OF_YEAR, 1)
+                }
             }
+
             setAlarm(calendar.timeInMillis)
         }
-        timePicker.show(parentFragmentManager, "time_picker")
+
+        timePicker.show(parentFragmentManager, "TIME_PICKER")
     }
 
-    private fun setAlarm(timeInMillis: Long){
+    private fun setAlarm(timeInMillis: Long) {
         val title = binding.titleEditText.text.toString()
-        if(title.isBlank()){
+        if (title.isBlank()) {
             Toast.makeText(requireContext(), "Сначала введите заголовок", Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(requireContext(), "Напоминание установлено", Toast.LENGTH_SHORT).show()
+
+        val intent = Intent(requireContext(), ReminderReceiver::class.java).apply {
+            putExtra("task_title", title)
+            putExtra("task_description", binding.contentEditText.text.toString())
+            putExtra("task_id", taskId)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            requireContext(),
+            taskId.takeIf { it != -1 } ?: System.currentTimeMillis().toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        try {
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                timeInMillis,
+                pendingIntent
+            )
+
+            val date = Calendar.getInstance().apply {
+                setTimeInMillis(timeInMillis)
+            }
+
+            val dateStr = "${date.get(Calendar.DAY_OF_MONTH)}.${date.get(Calendar.MONTH) + 1}.${date.get(Calendar.YEAR)}"
+            val timeStr = "${date.get(Calendar.HOUR_OF_DAY)}:${date.get(Calendar.MINUTE).toString().padStart(2, '0')}"
+
+            Toast.makeText(
+                requireContext(),
+                "Напоминание установлено на $dateStr в $timeStr",
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (e: SecurityException) {
+            Toast.makeText(
+                requireContext(),
+                "Ошибка: нет разрешения на установку напоминаний",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
-    private fun loadTaskIfExists(){
-        if(taskId != -1){
+    private fun loadTaskIfExists() {
+        if (taskId != -1) {
             viewLifecycleOwner.lifecycleScope.launch {
-                viewModel.getTaskById(taskId).collect {
-                    task ->
+                viewModel.getTaskById(taskId).collect { task ->
                     task?.let {
                         binding.titleEditText.setText(it.name)
                         binding.contentEditText.setText(it.description)
@@ -120,27 +222,25 @@ class NoteDetailFragment : Fragment() {
         }
     }
 
-    private fun saveTask(){
+    private fun saveTask() {
         val title = binding.titleEditText.text.toString()
         val description = binding.contentEditText.text.toString()
 
-        if (title.isBlank()){
+        if (title.isBlank()) {
             binding.titleEditText.error = "Введите заголовок"
             return
         }
 
-        val task = if(taskId != -1){
+        val task = if (taskId != -1) {
             Task(id = taskId, name = title, description = description)
-        }
-        else{
-            Task(id, name = title, description = description)
+        } else {
+            Task(id = id, name = title, description = description)
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            if(taskId!= -1){
+            if (taskId != -1) {
                 viewModel.updateTask(task)
-            }
-            else{
+            } else {
                 viewModel.addTask(task)
             }
             parentFragmentManager.popBackStack()
@@ -148,16 +248,6 @@ class NoteDetailFragment : Fragment() {
     }
 
     companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment NoteDetailFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
         fun newInstance(taskId: Int = -1): NoteDetailFragment =
             NoteDetailFragment().apply {
                 arguments = Bundle().apply {
