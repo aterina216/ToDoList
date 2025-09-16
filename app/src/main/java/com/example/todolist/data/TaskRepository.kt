@@ -16,4 +16,8 @@ class TaskRepository(private val taskDao: TaskDao) {
     fun getTaskById(id: Int): Flow<Task?>{
         return taskDao.getTaskById(id)
     }
+
+    suspend fun updateCompletionStatus(id: Int, isComlete: Boolean){
+        taskDao.updateCompletionStatus(id, isComlete)
+    }
 }

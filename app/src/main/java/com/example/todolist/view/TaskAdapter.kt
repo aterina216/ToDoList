@@ -8,7 +8,8 @@ import com.example.todolist.databinding.ItemTaskBinding
 import com.example.todolist.domain.Task
 
 class TaskAdapter(
-    private val onItemClick: (Task) -> Unit
+    private val onItemClick: (Task) -> Unit,
+    private val viewModel: TaskViewModel
 ) : RecyclerView.Adapter<TaskViewHolder>() {
 
     val taskList = mutableListOf<Task>()
@@ -18,7 +19,7 @@ class TaskAdapter(
         viewType: Int
     ): TaskViewHolder {
         val binding = ItemTaskBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return TaskViewHolder(binding, onItemClick)
+        return TaskViewHolder(binding, onItemClick, viewModel)
     }
 
     override fun onBindViewHolder(
@@ -40,13 +41,20 @@ class TaskAdapter(
 
 }
 
-class TaskViewHolder(val binding: ItemTaskBinding, private val onItemClick: (Task) -> Unit) : RecyclerView.ViewHolder(binding.root) {
+class TaskViewHolder(val binding: ItemTaskBinding, private val onItemClick: (Task) -> Unit,
+                     private val viewModel: TaskViewModel) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(task: Task){
         binding.taskTitleTextview.text = task.name
 
         binding.root.setOnClickListener {
             onItemClick(task)
+        }
+
+        binding.taskCheckbox.isChecked = task.isCompleted
+
+        binding.taskCheckbox.setOnCheckedChangeListener {
+            _, isChecked -> viewModel.updateCompletionStatus(task.id, isChecked)
         }
     }
 }

@@ -231,16 +231,14 @@ class NoteDetailFragment : Fragment() {
             return
         }
 
-        val task = if (taskId != -1) {
-            Task(id = taskId, name = title, description = description)
-        } else {
-            Task(id = id, name = title, description = description)
-        }
-
         viewLifecycleOwner.lifecycleScope.launch {
             if (taskId != -1) {
+                // Редактирование существующей задачи
+                val task = Task(id = taskId, name = title, description = description)
                 viewModel.updateTask(task)
             } else {
+                // Создание новой задачи - НЕ передаем id (автогенерация)
+                val task = Task(name = title, description = description)
                 viewModel.addTask(task)
             }
             parentFragmentManager.popBackStack()

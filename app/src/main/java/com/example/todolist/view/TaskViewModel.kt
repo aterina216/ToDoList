@@ -32,4 +32,10 @@ class TaskViewModel(private val repository: TaskRepository): ViewModel() {
     fun getTaskById(id: Int): Flow<Task?>{
         return repository.getTaskById(id)
     }
+
+    fun updateCompletionStatus(id: Int, isComplete: Boolean){
+        viewModelScope.launch {
+            repository.updateCompletionStatus(id, isComplete)
+        }
+    }
 }

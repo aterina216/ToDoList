@@ -25,7 +25,6 @@ import com.example.todolist.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
 import java.util.Objects
 
-// Замените на ваш package
 
 
 
@@ -46,19 +45,31 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater) // Инициализируем binding
         setContentView(binding.root)
 
-        adapter = TaskAdapter { task ->
+        val taskDao = AppDataBase.getDatabase(applicationContext).taskDao()
+        val repository = TaskRepository(taskDao)
+
+        viewModel = ViewModelProvider(
+            this,
+            object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return TaskViewModel(repository) as T
+                }
+            }
+        )[TaskViewModel::class.java]
+
+        adapter = TaskAdapter (  onItemClick = { task ->
             val fragment = NoteDetailFragment.newInstance(task.id)
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit()
-        }
-
+        },
+            viewModel
+        )
         binding.recyclerView.adapter = adapter
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
 
-        val taskDao = AppDataBase.getDatabase(applicationContext).taskDao()
-        val repository = TaskRepository(taskDao)
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -70,18 +81,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        viewModel = ViewModelProvider(
-            this,
-            object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return TaskViewModel(repository) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class")
-                }
-            }
-        )[TaskViewModel::class.java]
+
 
         // --- Добавляем логику свайпа для удаления ---
         val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
