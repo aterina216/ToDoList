@@ -15,23 +15,25 @@ import com.example.todolist.R
 
 
 
+
+
 class ReminderReceiver : BroadcastReceiver() {
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onReceive(context: Context, intent: Intent) {
         val title = intent.getStringExtra("task_title") ?: "Напоминание"
         val description = intent.getStringExtra("task_description") ?: ""
 
-        // Создаем канал уведомлений
-        createNotificationChannel(context)
+        // Создаем канал уведомлений (если еще не создан)
+        NotificationHelper.createNotificationChannel(context)
 
         // Создаем уведомление
-        val notification = NotificationCompat.Builder(context, "reminder_channel")
+        val notification = NotificationCompat.Builder(context, NotificationHelper.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(description)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setVibrate(longArrayOf(1000, 1000, 1000, 1000)) // Вибрация: пауза, вибрация, пауза, вибрация
+            .setVibrate(longArrayOf(1000, 1000, 1000, 1000))
             .build()
 
         // Показываем уведомление
@@ -39,22 +41,5 @@ class ReminderReceiver : BroadcastReceiver() {
             System.currentTimeMillis().toInt(),
             notification
         )
-    }
-
-    private fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "reminder_channel",
-                "Напоминания о задачах",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Канал для напоминаний о задачах"
-                enableVibration(true)
-                vibrationPattern = longArrayOf(1000, 1000, 1000, 1000)
-            }
-
-            val notificationManager = ContextCompat.getSystemService(context, NotificationManager::class.java)
-            notificationManager?.createNotificationChannel(channel)
-        }
     }
 }

@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        createNotificationChannel()
+        NotificationHelper.createNotificationChannel(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater) // Инициализируем binding
         setContentView(binding.root)
@@ -128,22 +128,6 @@ class MainActivity : AppCompatActivity() {
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit()
-        }
-    }
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "reminder_channel",
-                "Напоминания о задачах",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Канал для напоминаний о задачах"
-                enableVibration(true)
-                vibrationPattern = longArrayOf(1000, 1000, 1000, 1000)
-            }
-
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
         }
     }
 }
