@@ -12,5 +12,6 @@
     <color name="soft_blue">#7EB0DB</color>
     <color name="bright_orange">#FF6B35</color>
     <color name="bright_blue">#5B86E5</color>
+    <color name="colorAccent">#FF0000</color>
 
 </resources>

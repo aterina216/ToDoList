@@ -4,12 +4,15 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -34,6 +37,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewModel: TaskViewModel
     private lateinit var adapter: TaskAdapter
     private lateinit var binding: ActivityMainBinding // Добавляем binding как поле класса
+
+    private fun openFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(
+                R.anim.slide_in_right,
+                R.anim.slide_out_left,
+                R.anim.slide_in_left,
+                R.anim.slide_out_right
+            )
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,9 +76,7 @@ class MainActivity : AppCompatActivity() {
         adapter = TaskAdapter (  onItemClick = { task ->
             val fragment = NoteDetailFragment.newInstance(task.id)
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
-                .commit()
+            openFragment(fragment)
         },
             viewModel
         )
@@ -83,30 +97,58 @@ class MainActivity : AppCompatActivity() {
 
 
 
-        // --- Добавляем логику свайпа для удаления ---
         val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
-            0, // Мы не хотим перетаскивать элементы (drag & drop), поэтому 0
-            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT // Разрешаем свайп влево и вправо
+            0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
         ) {
-            override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
-            ): Boolean {
-                return false // Возвращаем false, так как не поддерживаем перетаскивание
+            override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
+                return false
             }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val taskToDelete = adapter.taskList[position]
-                    viewModel.deleteTask(taskToDelete)
-                    // После вызова deleteTask, Flow в ViewModel обновится,
-                    // и наш collector в lifecycleScope.launch { ... }
-                    // вызовет adapter.updateTasks, который обновит RecyclerView.
-                    // Нет необходимости вручную вызывать adapter.notifyItemRemoved(position),
-                    // так как updateTasks полностью обновляет список.
+
+                    // Анимация удаления
+                    val view = viewHolder.itemView
+                    view.animate()
+                        .translationX((if (direction == ItemTouchHelper.LEFT) -view.width else view.width).toFloat())
+                        .alpha(0f)
+                        .setDuration(300)
+                        .withEndAction {
+                            viewModel.deleteTask(taskToDelete)
+                        }
+                        .start()
                 }
+            }
+
+            override fun onChildDraw(
+                canvas: Canvas,
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                dX: Float,
+                dY: Float,
+                actionState: Int,
+                isCurrentlyActive: Boolean
+            ) {
+                val itemView = viewHolder.itemView
+                val background =
+                    ColorDrawable(ContextCompat.getColor(this@MainActivity, R.color.light_grey))
+                val backgroundCornerOffset = 20
+
+                when {
+                    dX > 0 -> { // Swiping to the right
+                        background.setBounds(itemView.left, itemView.top, itemView.left + dX.toInt() + backgroundCornerOffset, itemView.bottom)
+                    }
+                    dX < 0 -> { // Swiping to the left
+                        background.setBounds(itemView.right + dX.toInt() - backgroundCornerOffset, itemView.top, itemView.right, itemView.bottom)
+                    }
+                    else -> { // view is unSwiped
+                        background.setBounds(0, 0, 0, 0)
+                    }
+                }
+                background.draw(canvas)
+                super.onChildDraw(canvas, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
             }
         }
 
@@ -124,10 +166,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.addButton.setOnClickListener {
             val fragment = NoteDetailFragment.newInstance()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
-                .commit()
+            openFragment(fragment)
         }
     }
 }
